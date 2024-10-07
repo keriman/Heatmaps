@@ -3,11 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapa de calor con capa KML</title>
+    <title>Mapa de calor responsivo con capa KML</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
     <style>
-        #map { height: 800px; }
-        #file-input { margin-bottom: 10px; }
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+        #file-input {
+            position: absolute;
+            top: 10px;
+            left: 50px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+        }
         .info {
             padding: 6px 8px;
             font: 14px/16px Arial, Helvetica, sans-serif;
@@ -42,7 +58,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
     <script>
         var map = L.map('map').setView([19.7028, -101.1950], 12);
-
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
@@ -55,25 +70,32 @@
             }).filter(coord => !isNaN(coord[0]) && !isNaN(coord[1]));
 
             L.heatLayer(heatData, {
-                radius: 15,
-                blur: 15,
+                radius: 16,
+                blur: 20,
                 maxZoom: 17,
                 max: 1,
-                gradient: {0.4: 'blue', 0.65: 'lime', 1: 'red'}
+                minOpacity: 0.5,
+                gradient: {
+                    0.2: 'blue',
+                    0.4: 'cyan',
+                    0.6: 'lime',
+                    0.8: 'yellow',
+                    1.0: 'red'
+                }
             }).addTo(map);
 
             var legend = L.control({position: 'bottomright'});
             legend.onAdd = function (map) {
                 var div = L.DomUtil.create('div', 'info legend'),
-                    grades = [0, 0.4, 0.65, 1],
-                    labels = ['Baja', 'Media', 'Alta'],
-                    colors = ['blue', 'lime', 'red'];
+                    grades = [0.2, 0.4, 0.6, 0.8, 1],
+                    labels = ['Muy Baja', 'Baja', 'Media', 'Alta', 'Muy Alta'],
+                    colors = ['blue', 'cyan', 'lime', 'yellow', 'red'];
 
-                div.innerHTML += '<h4>Recurrencia del delito</h4>';
+                div.innerHTML += '<h4>Intensidad</h4>';
                 for (var i = 0; i < labels.length; i++) {
                     div.innerHTML +=
                         '<i style="background:' + colors[i] + '"></i> ' +
-                        labels[i] + '<br>';
+                        labels[i] + (grades[i + 1] ? '<br>' : '');
                 }
                 return div;
             };
@@ -85,12 +107,19 @@
             var kml = parser.parseFromString(content, 'text/xml');
             
             function processPlacemark(placemark) {
-                var name = placemark.querySelector('name').textContent;
+                var name = placemark.querySelector('description').textContent;
                 var coordinates = placemark.querySelector('coordinates').textContent.trim().split(',');
                 var lat = parseFloat(coordinates[1]);
                 var lon = parseFloat(coordinates[0]);
                 
-                L.marker([lat, lon]).addTo(map).bindPopup(name);
+                L.circleMarker([lat, lon], {
+                    radius: 5,
+                    fillColor: "#0000ff",
+                    color: "#000",
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).addTo(map).bindPopup(name);
             }
 
             var placemarks = kml.getElementsByTagName('Placemark');
@@ -121,6 +150,14 @@
                 reader.readAsText(file);
             }
         });
+
+        function resizeMap() {
+            document.getElementById('map').style.height = window.innerHeight + 'px';
+            map.invalidateSize();
+        }
+
+        window.addEventListener('load', resizeMap);
+        window.addEventListener('resize', resizeMap);
     </script>
 </body>
 </html>
