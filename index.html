@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de calor con capa KML</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+    <style>
+        #map { height: 800px; }
+        #file-input { margin-bottom: 10px; }
+        .info {
+            padding: 6px 8px;
+            font: 14px/16px Arial, Helvetica, sans-serif;
+            background: white;
+            background: rgba(255,255,255,0.8);
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            border-radius: 5px;
+        }
+        .info h4 {
+            margin: 0 0 5px;
+            color: #777;
+        }
+        .legend {
+            text-align: left;
+            line-height: 18px;
+            color: #555;
+        }
+        .legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <input type="file" id="file-input" accept=".csv,.kml" multiple>
+    <div id="map"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+    <script>
+        var map = L.map('map').setView([19.7028, -101.1950], 12);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        function processCSV(content) {
+            const rows = content.split('\n').slice(1);
+            const heatData = rows.map(row => {
+                const columns = row.split(',');
+                return [parseFloat(columns[7]), parseFloat(columns[8]), 1];
+            }).filter(coord => !isNaN(coord[0]) && !isNaN(coord[1]));
+
+            L.heatLayer(heatData, {
+                radius: 15,
+                blur: 15,
+                maxZoom: 17,
+                max: 1,
+                gradient: {0.4: 'blue', 0.65: 'lime', 1: 'red'}
+            }).addTo(map);
+
+            var legend = L.control({position: 'bottomright'});
+            legend.onAdd = function (map) {
+                var div = L.DomUtil.create('div', 'info legend'),
+                    grades = [0, 0.4, 0.65, 1],
+                    labels = ['Baja', 'Media', 'Alta'],
+                    colors = ['blue', 'lime', 'red'];
+
+                div.innerHTML += '<h4>Recurrencia del delito</h4>';
+                for (var i = 0; i < labels.length; i++) {
+                    div.innerHTML +=
+                        '<i style="background:' + colors[i] + '"></i> ' +
+                        labels[i] + '<br>';
+                }
+                return div;
+            };
+            legend.addTo(map);
+        }
+
+        function processKML(content) {
+            var parser = new DOMParser();
+            var kml = parser.parseFromString(content, 'text/xml');
+            
+            function processPlacemark(placemark) {
+                var name = placemark.querySelector('name').textContent;
+                var coordinates = placemark.querySelector('coordinates').textContent.trim().split(',');
+                var lat = parseFloat(coordinates[1]);
+                var lon = parseFloat(coordinates[0]);
+                
+                L.marker([lat, lon]).addTo(map).bindPopup(name);
+            }
+
+            var placemarks = kml.getElementsByTagName('Placemark');
+            for (var i = 0; i < placemarks.length; i++) {
+                processPlacemark(placemarks[i]);
+            }
+
+            var group = new L.featureGroup(map._layers);
+            map.fitBounds(group.getBounds());
+        }
+
+        document.getElementById('file-input').addEventListener('change', function(e) {
+            var files = e.target.files;
+            for (var i = 0; i < files.length; i++) {
+                var file = files[i];
+                var reader = new FileReader();
+
+                reader.onload = (function(theFile) {
+                    return function(e) {
+                        if (theFile.name.endsWith('.csv')) {
+                            processCSV(e.target.result);
+                        } else if (theFile.name.endsWith('.kml')) {
+                            processKML(e.target.result);
+                        }
+                    };
+                })(file);
+
+                reader.readAsText(file);
+            }
+        });
+    </script>
+</body>
+</html>
