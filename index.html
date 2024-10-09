@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapa de calor responsivo con capa KML</title>
+    <title>Heatmap con capa KML</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
     <style>
         html, body {
@@ -62,6 +62,14 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
+        var cameraIcon = L.icon({
+            iconUrl: 'cctv.png',
+            iconSize: [41, 41],
+            iconAnchor: [41, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        });
+
         function processCSV(content) {
             const rows = content.split('\n').slice(1);
             const heatData = rows.map(row => {
@@ -112,14 +120,7 @@
                 var lat = parseFloat(coordinates[1]);
                 var lon = parseFloat(coordinates[0]);
                 
-                L.circleMarker([lat, lon], {
-                    radius: 5,
-                    fillColor: "#0000ff",
-                    color: "#000",
-                    weight: 1,
-                    opacity: 1,
-                    fillOpacity: 0.8
-                }).addTo(map).bindPopup(name);
+                L.marker([lat, lon], {icon: cameraIcon}).addTo(map).bindPopup(name);
             }
 
             var placemarks = kml.getElementsByTagName('Placemark');
