@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Heatmap con capa KML</title>
+    <title>Heatmap con capa KML y XLSX</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
     <style>
         html, body {
@@ -51,11 +51,12 @@
     </style>
 </head>
 <body>
-    <input type="file" id="file-input" accept=".csv,.kml" multiple>
+    <input type="file" id="file-input" accept=".csv,.kml,.xlsx" multiple>
     <div id="map"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
         var map = L.map('map').setView([19.7028, -101.1950], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -77,37 +78,7 @@
                 return [parseFloat(columns[7]), parseFloat(columns[8]), 1];
             }).filter(coord => !isNaN(coord[0]) && !isNaN(coord[1]));
 
-            L.heatLayer(heatData, {
-                radius: 16,
-                blur: 20,
-                maxZoom: 17,
-                max: 1,
-                minOpacity: 0.5,
-                gradient: {
-                    0.2: 'blue',
-                    0.4: 'cyan',
-                    0.6: 'lime',
-                    0.8: 'yellow',
-                    1.0: 'red'
-                }
-            }).addTo(map);
-
-            var legend = L.control({position: 'bottomright'});
-            legend.onAdd = function (map) {
-                var div = L.DomUtil.create('div', 'info legend'),
-                    grades = [0.2, 0.4, 0.6, 0.8, 1],
-                    labels = ['Muy Baja', 'Baja', 'Media', 'Alta', 'Muy Alta'],
-                    colors = ['blue', 'cyan', 'lime', 'yellow', 'red'];
-
-                div.innerHTML += '<h4>Intensidad</h4>';
-                for (var i = 0; i < labels.length; i++) {
-                    div.innerHTML +=
-                        '<i style="background:' + colors[i] + '"></i> ' +
-                        labels[i] + (grades[i + 1] ? '<br>' : '');
-                }
-                return div;
-            };
-            legend.addTo(map);
+            addHeatLayer(heatData);
         }
 
         function processKML(content) {
@@ -127,9 +98,53 @@
             for (var i = 0; i < placemarks.length; i++) {
                 processPlacemark(placemarks[i]);
             }
+        }
 
-            var group = new L.featureGroup(map._layers);
-            map.fitBounds(group.getBounds());
+        function processXLSX(workbook) {
+            var sheetName = workbook.SheetNames[0];
+            var worksheet = workbook.Sheets[sheetName];
+            var data = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+
+            var heatData = data.slice(1).map(row => {
+                return [parseFloat(row[7]), parseFloat(row[8]), 1];
+            }).filter(coord => !isNaN(coord[0]) && !isNaN(coord[1]));
+
+            addHeatLayer(heatData);
+        }
+
+        function addHeatLayer(heatData) {
+            L.heatLayer(heatData, {
+                radius: 16,
+                blur: 20,
+                maxZoom: 17,
+                max: 1,
+                minOpacity: 0.5,
+                gradient: {
+                    0.2: 'blue',
+                    0.4: 'cyan',
+                    0.6: 'lime',
+                    0.8: 'yellow',
+                    1.0: 'red'
+                }
+            }).addTo(map);
+
+            // Código de la leyenda
+            var legend = L.control({position: 'bottomright'});
+            legend.onAdd = function (map) {
+                var div = L.DomUtil.create('div', 'info legend'),
+                    grades = [0.2, 0.4, 0.6, 0.8, 1],
+                    labels = ['Muy Baja', 'Baja', 'Media', 'Alta', 'Muy Alta'],
+                    colors = ['blue', 'cyan', 'lime', 'yellow', 'red'];
+
+                div.innerHTML += '<h4>Intensidad</h4>';
+                for (var i = 0; i < labels.length; i++) {
+                    div.innerHTML +=
+                        '<i style="background:' + colors[i] + '"></i> ' +
+                        labels[i] + (grades[i + 1] ? '<br>' : '');
+                }
+                return div;
+            };
+            legend.addTo(map);
         }
 
         document.getElementById('file-input').addEventListener('change', function(e) {
@@ -144,11 +159,19 @@
                             processCSV(e.target.result);
                         } else if (theFile.name.endsWith('.kml')) {
                             processKML(e.target.result);
+                        } else if (theFile.name.endsWith('.xlsx')) {
+                            var data = new Uint8Array(e.target.result);
+                            var workbook = XLSX.read(data, {type: 'array'});
+                            processXLSX(workbook);
                         }
                     };
                 })(file);
 
-                reader.readAsText(file);
+                if (file.name.endsWith('.xlsx')) {
+                    reader.readAsArrayBuffer(file);
+                } else {
+                    reader.readAsText(file);
+                }
             }
         });
 
